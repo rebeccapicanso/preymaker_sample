@@ -96,6 +96,7 @@ class SubwayJson:
                 return True
         return False
 
+    # too many nested for loops but for the sake of readability
     def get_delays(self):
         data = self.get_json()
         for train in self.trains:
