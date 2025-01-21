@@ -8,4 +8,4 @@ the second just queries the MTA train service alerts public api and get active s
 
 Feel free to look at other projects for examples of database, aws integration, etc. as i update my github :)
 
-I added some psuedocode but it's not easily runnable as its postgres integration, there's some credential hardcoding which would // ***never*** // happen in a production or dev environment.
+I added some psuedocode for postgres integration and another way of approaching the image processing, there's some credential hardcoding which would // ***never*** // happen in a production or dev environment.
