@@ -7,4 +7,5 @@ the first class unzips a large zip file, and as that png is generated its stored
 the second just queries the MTA train service alerts public api and get active subway alerts based upon select trains. It prints these alerts to terminal, colored by enum.
 
 Feel free to look at other projects for examples of database, aws integration, etc. as i update my github :)
+
 I added some psuedocode but it's not easily runnable as its postgres integration, there's some credential hardcoding which would // ***never*** // happen in a production or dev environment.
