@@ -115,6 +115,9 @@ class Blender:
         conn = None
         try:
             conn = self.connection_pool.getconn()
+
+            # args = ','.join(cur.mogrify("(%s)", (name,)).decode('utf-8') 
+            # for name in file_names)
             with conn.cursor() as cur:
                 cur.execute(
                     "INSERT INTO file_names (file_name) VALUES (%s) RETURNING id", 
@@ -132,7 +135,12 @@ class Blender:
                 self.connection_pool.putconn(conn)
     
     # resize with pillow & convert to numpy array
+    # this could definitely be done in a batch - see perfectcrop.py
+    # an alternative would be using a buffer of like 10
     def get_frames(self):
+        frames_buffer = []
+        frames_buffer_size = 10
+        
         with zipfile.ZipFile(self.zip_path) as zip_ref:
             for name in zip_ref.namelist():
                 # not needed but this incase you reuse this script
@@ -143,31 +151,42 @@ class Blender:
                     img = Image.open(io.BytesIO(img_data))
                     img = img.resize(self.size)
                     frame = np.array(img).astype(float)
-                    print(f"frame -> {name}")
-                    # Submit the store_file_name task to the executor
-                    future = self.executor.submit(self.store_file_name, name)
+                    frames_buffer.append((frame, name))
+
+                    ## addition below.. in memory blending.
+                    if len(frame_buffer) >= frames_buffer_size:
+                        batch_names = [name for _, name in frames_buffer]
+                        self.executor.submit(self.store_file_name, batch_names)
+                        
+                        for frame, _ in frames_buffer:
+                            yield frame
+                        print(f"frames -> {frame_buffer}")
+                        frames_buffer.clear()
+
                     yield frame
                 except Exception as e:
                     logging.error(f"Error processing {name}: {e}")
-    
+
+    # more memory integration.
     def blend_pics(self):
-        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
-            self.temp_path = tmp.name
-            first = True
-            
-            for frame in self.get_frames():
-                if first:
-                    Image.fromarray(frame.astype('uint8')).save(self.temp_path)
-                    first = False
-                else:
-                    # previous results & blend
-                    result = np.array(Image.open(self.temp_path)).astype(float)
-                    # using a simple weighted average
-                    result = result * (1 - self.blend_amount) + frame * self.blend_amount
-                    Image.fromarray(result.astype('uint8')).save(self.temp_path)
-            
-            os.replace(self.temp_path, self.output_path)
+        result = None
+        frames_processed = 0
+        
+        for frame in self.get_frames():
+            if result is None:
+                result = frame
+            else:
+                result = result * (1 - self.blend_amount) + frame * self.blend_amount
+            frames_processed += 1
+            if frames_processed % 1000 == 0:
+                Image.fromarray(result.astype('uint8')).save(self.output_path)
+        
+        if result is not None:
+            Image.fromarray(result.astype('uint8')).save(self.output_path)
             print(f"saved -> {self.output_path}")
+        
+        if self.filename_buffer:
+            self.store_file_names_batch(self.filename_buffer)
     
     def __del__(self):
         if self.executor:
